@@ -7,6 +7,7 @@ import SuperAdminDashboard from './Components/CompanyIntro/SuperAdminDashboard.j
 import DashboardLayout from './DashboardLayout .jsx';
 import TeamManagement from './Components/CompanyIntro/TeamManagement.jsx';
 import Reports from './Reports.jsx';
+import CreateStaff from './CreateStaff.jsx';
 
 
 
@@ -23,6 +24,7 @@ function App() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="TeamManagement" element={<TeamManagement />} />
             <Route path="Reports" element={<Reports />} />
+            <Route path="create-staff" element={<CreateStaff />} />
           </Route>
         </Routes>
         {/* <Footer/> */}
