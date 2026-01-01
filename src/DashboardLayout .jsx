@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from "react";
+import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
   UserCheck,
@@ -15,9 +15,8 @@ import {
   Settings,
   LogOut,
   X,
-  ShieldCheck,
   Zap,
-} from 'lucide-react';
+} from "lucide-react";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,22 +25,22 @@ const DashboardLayout = () => {
   const location = useLocation();
 
   const menuItems = [
-    { path: '/admin/dashboard', icon: BarChart3, label: 'Dashboard' },
-    { path: '/admin/TeamManagement', icon: Users, label: 'Team Management' },
-    { path: '/admin/customers', icon: UserCheck, label: 'All Customers' },
-    { path: '/admin/calls', icon: Phone, label: 'Call Records' },
-    { path: '/admin/followups', icon: Calendar, label: 'Follow-ups' },
-    { path: '/admin/reports', icon: TrendingUp, label: 'Reports' },
-    { path: '/admin/settings', icon: Settings, label: 'Settings' },
+    { path: "/admin/dashboard", icon: BarChart3, label: "DASHBOARD" },
+    { path: "/admin/TeamManagement", icon: Users, label: "TEAM MANAGEMENT" },
+    { path: "/admin/customers", icon: UserCheck, label: "ALL CUSTOMERS" },
+    { path: "/admin/calls", icon: Phone, label: "CALL RECORDS" },
+    { path: "/admin/followups", icon: Calendar, label: "FOLLOW-UPS" },
+    { path: "/admin/reports", icon: TrendingUp, label: "REPORTS" },
+    { path: "/admin/settings", icon: Settings, label: "SETTINGS" },
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/admin/login');
+    localStorage.removeItem("token");
+    navigate("/admin/login");
   };
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900">
+    <div className="flex h-screen bg-[#050505] font-sans text-slate-200 selection:bg-amber-500/30">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -49,7 +48,7 @@ const DashboardLayout = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] lg:hidden"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -60,42 +59,42 @@ const DashboardLayout = () => {
         animate={{ width: sidebarCollapsed ? 88 : 280 }}
         className={`
           fixed lg:static inset-y-0 left-0 z-[70]
-          bg-[#0F172A] text-white flex flex-col shadow-2xl shadow-blue-900/20
+          bg-[#0A0A0A] border-r border-white/[0.05] flex flex-col
           ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+            sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }
           transition-all duration-300 ease-in-out
         `}
       >
         {/* Logo Section */}
-        <div className="h-20 flex items-center px-6 mb-4">
+        <div className="h-24 flex items-center px-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/40 flex-shrink-0">
-              <Zap className="w-6 h-6 text-white fill-current" />
+            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.2)] flex-shrink-0">
+              <Zap className="w-6 h-6 text-black fill-current" />
             </div>
             {!sidebarCollapsed && (
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-xl font-black tracking-tight italic"
+                className="text-2xl font-black tracking-tighter italic text-white"
               >
-                NEXUS
-                <span className="text-blue-500 text-xs not-italic font-bold ml-1">
-                  CRM
+                A2V
+                <span className="text-amber-500 text-[10px] not-italic font-bold ml-1 tracking-widest block">
+                  CRM PREMIUM
                 </span>
               </motion.span>
             )}
           </div>
           <button
-            className="lg:hidden ml-auto"
+            className="lg:hidden ml-auto text-amber-500"
             onClick={() => setSidebarOpen(false)}
           >
-            <X className="w-6 h-6 text-slate-400" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 px-4 space-y-1.5 mt-4 overflow-y-auto no-scrollbar">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -107,39 +106,38 @@ const DashboardLayout = () => {
                 onClick={() => setSidebarOpen(false)}
                 className={`
                   relative flex items-center h-12 rounded-xl transition-all duration-200 group
-                  ${sidebarCollapsed ? 'justify-center' : 'px-4 gap-4'}
+                  ${sidebarCollapsed ? "justify-center" : "px-4 gap-4"}
                   ${
                     isActive
-                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                      ? "bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]"
+                      : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.03]"
                   }
                 `}
               >
-                {/* Active Indicator Line */}
-                {isActive && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute left-0 w-1 h-6 bg-blue-500 rounded-r-full"
-                  />
-                )}
-
                 <Icon
-                  size={isActive ? 22 : 20}
+                  size={isActive ? 20 : 18}
                   className={
                     isActive
-                      ? 'text-blue-500'
-                      : 'group-hover:scale-110 transition-transform'
+                      ? "text-amber-500"
+                      : "group-hover:scale-110 transition-transform"
                   }
                 />
 
                 {!sidebarCollapsed && (
                   <span
-                    className={`text-sm font-bold tracking-tight ${
-                      isActive ? 'text-white' : ''
+                    className={`text-xs font-bold tracking-tight ${
+                      isActive ? "text-white" : ""
                     }`}
                   >
                     {item.label}
                   </span>
+                )}
+
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute left-0 w-1 h-6 bg-amber-500 rounded-r-full"
+                  />
                 )}
               </Link>
             );
@@ -147,24 +145,26 @@ const DashboardLayout = () => {
         </nav>
 
         {/* User Profile Section */}
-        <div className="p-4 bg-slate-800/30 border-t border-slate-800/50">
+        <div className="p-4 bg-white/[0.02] border-t border-white/[0.05]">
           <div
             className={`flex items-center ${
-              sidebarCollapsed ? 'justify-center' : 'gap-3'
+              sidebarCollapsed ? "justify-center" : "gap-3"
             } p-2 rounded-2xl`}
           >
             <div className="relative">
               <img
-                src="https://ui-avatars.com/api/?name=Admin+User&background=2563eb&color=fff"
-                className="w-10 h-10 rounded-xl border-2 border-slate-700"
+                src={`https://ui-avatars.com/api/?name=Admin+User&background=f59e0b&color=000&bold=true`}
+                className="w-10 h-10 rounded-xl border-2 border-amber-500/20"
                 alt="avatar"
               />
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>
+              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-[#0A0A0A] rounded-full"></div>
             </div>
             {!sidebarCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate">Admin User</p>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <p className="text-sm font-bold text-white truncate">
+                  Admin User
+                </p>
+                <p className="text-[10px] font-black text-amber-500/60 uppercase tracking-widest">
                   Super Admin
                 </p>
               </div>
@@ -177,18 +177,13 @@ const DashboardLayout = () => {
               mt-4 w-full flex items-center justify-center gap-2 h-10 rounded-xl transition-all
               ${
                 sidebarCollapsed
-                  ? 'bg-transparent text-slate-400 hover:text-red-400'
-                  : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white'
+                  ? "text-slate-500 hover:text-red-500"
+                  : "bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white text-xs font-bold tracking-tight"
               }
             `}
-            title="Logout"
           >
-            <LogOut size={18} />
-            {!sidebarCollapsed && (
-              <span className="text-xs font-black uppercase tracking-widest">
-                Logout
-              </span>
-            )}
+            <LogOut size={16} />
+            {!sidebarCollapsed && <span>LOGOUT</span>}
           </button>
         </div>
       </motion.aside>
@@ -196,53 +191,53 @@ const DashboardLayout = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 flex items-center justify-between z-40">
+        <header className="h-20 bg-[#0A0A0A]/80 backdrop-blur-md border-b border-white/[0.05] px-8 flex items-center justify-between z-40">
           <div className="flex items-center gap-4">
             <button
-              className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+              className="p-2 hover:bg-white/[0.05] rounded-xl transition-all text-slate-400 hover:text-amber-500"
               onClick={() => {
                 if (window.innerWidth < 1024) setSidebarOpen(true);
                 else setSidebarCollapsed(!sidebarCollapsed);
               }}
             >
-              <Menu size={20} className="text-slate-600" />
+              <Menu size={22} />
             </button>
-            <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-              Super Admin Panel
+            <h1 className="text-lg font-bold text-white tracking-tight hidden sm:block">
+              Super Admin <span className="text-amber-500">Panel</span>
             </h1>
           </div>
 
           <div className="flex items-center gap-4 lg:gap-8">
             {/* Professional Search */}
             <div className="relative hidden md:flex items-center">
-              <Search className="absolute left-3 text-slate-400" size={18} />
+              <Search className="absolute left-3 text-slate-500" size={18} />
               <input
                 type="text"
                 placeholder="Search analytics..."
-                className="pl-10 pr-4 py-2 w-64 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 transition-all outline-none font-medium"
+                className="pl-10 pr-4 py-2 w-64 bg-white/[0.03] border border-white/[0.05] rounded-xl text-sm text-white focus:ring-1 focus:ring-amber-500/50 transition-all outline-none font-medium"
               />
             </div>
 
             <div className="flex items-center gap-4">
-              <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-all">
+              <button className="relative p-2 text-slate-400 hover:bg-white/[0.05] rounded-xl transition-all">
                 <Bell size={20} />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-blue-600 rounded-full border-2 border-white"></span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full border-2 border-[#0A0A0A]"></span>
               </button>
 
-              <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden lg:block"></div>
+              <div className="h-8 w-[1px] bg-white/[0.1] mx-2 hidden lg:block"></div>
 
               <button className="flex items-center gap-2 group">
-                <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-md group-hover:shadow-blue-200 transition-all">
+                <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center text-black font-bold shadow-lg shadow-amber-500/10">
                   A
                 </div>
-                <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-amber-500 transition-colors" />
               </button>
             </div>
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
+        <main className="flex-1 overflow-y-auto bg-[#050505] p-6">
           <Outlet />
         </main>
       </div>
