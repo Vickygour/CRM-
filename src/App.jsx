@@ -17,7 +17,7 @@ function App() {
       <BrowserRouter>
         {/* <Header /> */}
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Login />} />
 
           <Route path="/admin" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
