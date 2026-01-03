@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -11,61 +11,95 @@ import {
   Save,
   XCircle,
   Phone,
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import api from '../src/api'; // Your axios instance
+  Edit2,
+} from "lucide-react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { motion } from "framer-motion";
+import api from "../src/api";
 
 const CreateStaff = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams();
+
+  // Mode identify karein
+  const isEditMode = !!id || !!location.state?.user;
+
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '', // Optional field
-    role: 'sales', // Match schema enum: owner, manager, sales, designer, writer, developer
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phone: "",
+    role: "sales",
     isActive: true,
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // ⭐ Logic to Auto-fill data if Editing
+  useEffect(() => {
+    if (isEditMode) {
+      if (location.state?.user) {
+        const u = location.state.user;
+        setFormData({
+          name: u.name || "",
+          email: u.email || "",
+          phone: u.phone || "",
+          role: u.role || "sales",
+          password: "",
+          confirmPassword: "",
+          isActive: u.isActive ?? true,
+        });
+      } else if (id) {
+        const fetchUser = async () => {
+          try {
+            const res = await api.get(`/auth/user/${id}`);
+            if (res.data) {
+              const u = res.data;
+              setFormData({
+                name: u.name || "",
+                email: u.email || "",
+                phone: u.phone || "",
+                role: u.role || "sales",
+                password: "",
+                confirmPassword: "",
+              });
+            }
+          } catch (err) {
+            console.error("Fetch error:", err);
+          }
+        };
+        fetchUser();
+      }
+    }
+  }, [id, location.state, isEditMode]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === "checkbox" ? checked : value,
     });
-    // Clear error for this field
-    if (errors[name]) setErrors({ ...errors, [name]: '' });
+    if (errors[name]) setErrors({ ...errors, [name]: "" });
   };
 
   const validateForm = () => {
     const newErrors = {};
+    if (!formData.name.trim()) newErrors.name = "Name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
 
-    // Name validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+    if (!isEditMode) {
+      if (!formData.password) {
+        newErrors.password = "Password is required";
+      } else if (formData.password.length < 6) {
+        newErrors.password = "Minimum 6 characters required";
+      }
     }
 
-    // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Minimum 6 characters required';
-    }
-
-    // Confirm password validation
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
     setErrors(newErrors);
@@ -77,29 +111,48 @@ const CreateStaff = () => {
     if (!validateForm()) return;
 
     setLoading(true);
+    setErrors({});
+
     try {
-      // ⭐ API call to /auth/register matching your User schema
-      const response = await api.post('/auth/register', {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password, // Backend will hash this with bcrypt
-        phone: formData.phone || undefined, // Optional
-        role: formData.role,
-        // isActive is handled by backend (default: true)
-      });
+      // ⭐ Correct ID Extraction
+      const userId =
+        id || location.state?.user?._id || location.state?.user?.id;
 
-      console.log('✅ Registration response:', response.data);
+      if (isEditMode) {
+        if (!userId) {
+          setErrors({ submit: "Critical Error: User ID missing for update." });
+          setLoading(false);
+          return;
+        }
 
-      if (response.data.success) {
-        alert('✅ Team member created successfully!');
-        navigate('/admin/TeamManagement');
+        // ⭐ UPDATE API CALL
+        // Note: Apne backend route ke mutabik check karein: /update-user ya /update
+        const response = await api.put(`/auth/update-user/${userId}`, {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          role: formData.role,
+          ...(formData.password && { password: formData.password }),
+        });
+
+        if (response.data) {
+          alert("✅ Node updated successfully!");
+          navigate("/admin/TeamManagement");
+        }
+      } else {
+        // ⭐ CREATE API CALL
+        const response = await api.post("/auth/register", formData);
+        if (response.data) {
+          alert("✅ Team member created successfully!");
+          navigate("/admin/TeamManagement");
+        }
       }
     } catch (error) {
-      console.error('❌ Registration error:', error);
+      console.error("API Error:", error.response?.data || error.message);
       setErrors({
         submit:
           error.response?.data?.message ||
-          'Failed to create team member. Please try again.',
+          "Operation failed. Backend connection error.",
       });
     } finally {
       setLoading(false);
@@ -108,7 +161,6 @@ const CreateStaff = () => {
 
   return (
     <div className="min-h-screen bg-[#020202] text-white p-6 lg:p-12 font-['Space_Grotesk'] relative overflow-hidden">
-      {/* Background Glow */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-600/5 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Header */}
@@ -118,7 +170,7 @@ const CreateStaff = () => {
         className="max-w-5xl mx-auto mb-10"
       >
         <button
-          onClick={() => navigate('/admin/TeamManagement')}
+          onClick={() => navigate("/admin/TeamManagement")}
           className="group flex items-center gap-2 text-white/40 hover:text-amber-500 transition-all mb-6 uppercase text-[10px] tracking-[0.3em] font-black"
         >
           <ArrowLeft
@@ -128,15 +180,14 @@ const CreateStaff = () => {
           Back to Command Center
         </button>
         <h1 className="text-5xl font-light tracking-tighter">
-          Initialize{' '}
+          {isEditMode ? "Modify " : "Initialize "}
           <span className="font-black italic bg-gradient-to-r from-amber-200 via-amber-500 to-amber-700 bg-clip-text text-transparent">
-            NEW_NODE
+            {isEditMode ? "NODE_CONFIG" : "NEW_NODE"}
           </span>
         </h1>
       </motion.div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -149,10 +200,12 @@ const CreateStaff = () => {
               </div>
               <div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-white/80">
-                  Entity Configuration
+                  {isEditMode ? "Update Parameters" : "Entity Configuration"}
                 </h2>
                 <p className="text-[10px] text-white/30 uppercase tracking-[0.2em]">
-                  Define node parameters and access levels
+                  {isEditMode
+                    ? "Modifying existing node sequence"
+                    : "Define node parameters and access levels"}
                 </p>
               </div>
             </div>
@@ -211,7 +264,7 @@ const CreateStaff = () => {
                   )}
                 </div>
 
-                {/* Phone (Optional) */}
+                {/* Phone */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
                     Contact Number
@@ -232,7 +285,7 @@ const CreateStaff = () => {
                   </div>
                 </div>
 
-                {/* Role Selection */}
+                {/* Role */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
                     Node Permissions *
@@ -267,7 +320,7 @@ const CreateStaff = () => {
                 {/* Password */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
-                    Access Key *
+                    {isEditMode ? "New Access Key (Optional)" : "Access Key *"}
                   </label>
                   <div className="relative group">
                     <Lock
@@ -279,21 +332,20 @@ const CreateStaff = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      placeholder="Min. 6 characters"
+                      placeholder={
+                        isEditMode
+                          ? "Leave blank to keep current"
+                          : "Min. 6 characters"
+                      }
                       className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all font-medium text-sm"
                     />
                   </div>
-                  {errors.password && (
-                    <p className="text-[9px] text-red-500 font-bold uppercase tracking-tighter ml-1">
-                      ⚠ {errors.password}
-                    </p>
-                  )}
                 </div>
 
                 {/* Confirm Password */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
-                    Verify Key *
+                    Verify Key
                   </label>
                   <div className="relative group">
                     <ShieldCheck
@@ -317,7 +369,6 @@ const CreateStaff = () => {
                 </div>
               </div>
 
-              {/* Submit Error */}
               {errors.submit && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -331,29 +382,22 @@ const CreateStaff = () => {
                 </motion.div>
               )}
 
-              {/* Action Buttons */}
               <div className="pt-6 flex flex-col sm:flex-row gap-4">
                 <button
                   type="submit"
                   disabled={loading}
                   className="flex-1 py-4 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-500/50 text-black rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] transition-all shadow-[0_0_30px_rgba(245,158,11,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
-                      Synchronizing...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} /> Register Node
-                    </>
-                  )}
+                  {loading
+                    ? "Synchronizing..."
+                    : isEditMode
+                    ? "Update Configuration"
+                    : "Register Node"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/admin/TeamManagement')}
-                  disabled={loading}
-                  className="px-10 py-4 border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] transition-all"
+                  onClick={() => navigate("/admin/TeamManagement")}
+                  className="px-10 py-4 border border-white/10 hover:bg-white/5 rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] transition-all"
                 >
                   Abort
                 </button>
@@ -361,81 +405,6 @@ const CreateStaff = () => {
             </form>
           </div>
         </motion.div>
-
-        {/* Info Sidebar */}
-        <div className="space-y-6">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-amber-500/10 via-transparent to-transparent border border-amber-500/20 rounded-[2rem] p-8"
-          >
-            <Cpu className="text-amber-500 mb-4" size={32} />
-            <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-              Protocol Specs
-            </h3>
-            <ul className="space-y-4">
-              {[
-                'Automatic Encryption (Bcrypt v12)',
-                'Role-Based Access Control (RBAC)',
-                'Real-time Node Monitoring',
-                'Instant Credential Dispatch',
-                'Email Uniqueness Validation',
-                'Default Active Status',
-              ].map((item, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-center gap-3 text-[10px] font-bold text-white/50 uppercase tracking-tighter"
-                >
-                  <div className="w-1 h-1 bg-amber-500 rounded-full" /> {item}
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-8"
-          >
-            <Sparkles className="text-white/20 mb-4" size={24} />
-            <p className="text-xs italic text-white/40 leading-relaxed">
-              "Password hashing is handled securely on the backend using bcrypt
-              with 12 salt rounds. Never send hashed passwords from the
-              frontend."
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6"
-          >
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-3">
-              Available Roles
-            </h4>
-            <div className="space-y-2">
-              {[
-                { role: 'Owner', desc: 'Full system access' },
-                { role: 'Manager', desc: 'Team oversight' },
-                { role: 'Sales', desc: 'CRM operations' },
-                { role: 'Developer', desc: 'Tech tasks' },
-                { role: 'Designer', desc: 'Creative work' },
-                { role: 'Writer', desc: 'Content creation' },
-              ].map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between text-[9px] text-white/30"
-                >
-                  <span className="font-bold uppercase">{r.role}</span>
-                  <span className="italic">{r.desc}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
       </div>
     </div>
   );
