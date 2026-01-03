@@ -8,6 +8,8 @@ import DashboardLayout from './DashboardLayout .jsx';
 import TeamManagement from './Components/CompanyIntro/TeamManagement.jsx';
 import Reports from './Reports.jsx';
 import CreateStaff from './CreateStaff.jsx';
+import AllCustomers from './Components/CompanyIntro/AllCustomers.jsx';
+import CreateCustomer from './Components/CompanyIntro/CreateCustomer.jsx';
 
 
 
@@ -25,6 +27,8 @@ function App() {
             <Route path="TeamManagement" element={<TeamManagement />} />
             <Route path="Reports" element={<Reports />} />
             <Route path="create-staff" element={<CreateStaff />} />
+            <Route path="customers" element={<AllCustomers />} />
+            <Route path="create-customer" element={<CreateCustomer/>} />
           </Route>
         </Routes>
         {/* <Footer/> */}
