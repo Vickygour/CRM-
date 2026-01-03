@@ -14,13 +14,20 @@ import {
   Sparkles,
   TrendingUp,
   Users,
+  Edit2,
+  Loader2,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api';
 
 const CreateCustomer = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const location = useLocation();
+
+  const isEditMode = !!id || !!location.state?.lead;
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,29 +45,129 @@ const CreateCustomer = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [fetchingLead, setFetchingLead] = useState(false);
 
-  // Fetch users for assignment dropdown
+  // ⭐ Fetch users for assignment dropdown
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // ⭐ Auto-fill data when editing
+  useEffect(() => {
+    if (isEditMode) {
+      if (location.state?.lead) {
+        const l = location.state.lead;
+        console.log('✅ Lead from location.state:', l);
+        prefillForm(l);
+      } else if (id) {
+        fetchLeadData(id);
+      }
+    }
+  }, [id, location.state, isEditMode]);
 
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
       const response = await api.get('/auth/users');
-      if (response.data.success) {
-        setUsers(response.data.data);
-        // Auto-select current user if available
-        const currentUser = response.data.data[0];
-        if (currentUser) {
-          setFormData((prev) => ({ ...prev, assignedTo: currentUser._id }));
+
+      console.log('📥 Full API Response:', response);
+      console.log('📦 Response Data:', response.data);
+
+      // ⭐ Correct mapping according to your structure
+      if (response.data.success && response.data.data) {
+        const usersArray = response.data.data; // Array of users
+        console.log('👥 Users Array:', usersArray);
+
+        setUsers(usersArray);
+
+        // Auto-select first user if creating new
+        if (!isEditMode && usersArray.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            assignedTo: usersArray[0]._id,
+          }));
+          console.log('✅ Auto-selected user:', usersArray[0]._id);
         }
+      } else {
+        console.warn('⚠️ No users found in response');
       }
     } catch (err) {
       console.error('❌ Error fetching users:', err);
+      console.error('Error response:', err.response?.data);
     } finally {
       setLoadingUsers(false);
     }
+  };
+
+  const fetchLeadData = async (leadId) => {
+    try {
+      setFetchingLead(true);
+      const response = await api.get(`/leads/${leadId}`);
+
+      console.log('📥 Lead Response:', response);
+      console.log('📦 Lead Data:', response.data);
+
+      // ⭐ Correct mapping for lead data
+      if (response.data.success && response.data.data) {
+        const leadData = response.data.data;
+        console.log('📝 Lead Object:', leadData);
+        prefillForm(leadData);
+      } else if (response.data.data) {
+        // Fallback if success flag missing
+        prefillForm(response.data.data);
+      }
+    } catch (err) {
+      console.error('❌ Fetch lead error:', err);
+      console.error('Error response:', err.response?.data);
+      setErrors({
+        submit: err.response?.data?.message || 'Failed to fetch customer data',
+      });
+    } finally {
+      setFetchingLead(false);
+    }
+  };
+
+  const prefillForm = (lead) => {
+    console.log('🔄 Prefilling form with:', lead);
+
+    // Format nextFollowUp date for datetime-local input
+    let formattedFollowUp = '';
+    if (lead.nextFollowUp) {
+      try {
+        const date = new Date(lead.nextFollowUp);
+        formattedFollowUp = date.toISOString().slice(0, 16);
+        console.log('📅 Formatted follow-up date:', formattedFollowUp);
+      } catch (err) {
+        console.error('❌ Date formatting error:', err);
+      }
+    }
+
+    // ⭐ Handle assignedTo field (can be ObjectId or populated object)
+    let assignedToId = '';
+    if (lead.assignedTo) {
+      if (typeof lead.assignedTo === 'object' && lead.assignedTo._id) {
+        assignedToId = lead.assignedTo._id; // Populated object
+      } else if (typeof lead.assignedTo === 'string') {
+        assignedToId = lead.assignedTo; // Just ObjectId
+      }
+    }
+    console.log('👤 Assigned To ID:', assignedToId);
+
+    const newFormData = {
+      name: lead.name || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      company: lead.company || '',
+      source: lead.source || 'website',
+      status: lead.status || 'new',
+      priority: lead.priority || 'medium',
+      dealValue: lead.dealValue || '',
+      assignedTo: assignedToId,
+      nextFollowUp: formattedFollowUp,
+    };
+
+    console.log('✅ Form data set:', newFormData);
+    setFormData(newFormData);
   };
 
   const handleChange = (e) => {
@@ -96,6 +203,8 @@ const CreateCustomer = () => {
     if (!validateForm()) return;
 
     setLoading(true);
+    setErrors({});
+
     try {
       const payload = {
         name: formData.name,
@@ -110,28 +219,66 @@ const CreateCustomer = () => {
         nextFollowUp: formData.nextFollowUp || undefined,
       };
 
-      const response = await api.post('/leads', payload);
+      console.log('📤 Submit Payload:', payload);
 
-      if (response.data.success) {
-        alert('✅ Customer added successfully!');
-        navigate('/admin/customers');
+      if (isEditMode) {
+        const leadId = id || location.state?.lead?._id;
+
+        if (!leadId) {
+          setErrors({ submit: 'Lead ID missing. Cannot update.' });
+          setLoading(false);
+          return;
+        }
+
+        console.log('🔄 Updating lead:', leadId);
+        const response = await api.put(`/leads/${leadId}`, payload);
+        console.log('✅ Update response:', response.data);
+
+        if (response.data.success) {
+          alert('✅ Customer updated successfully!');
+          navigate('/admin/customers');
+        }
+      } else {
+        console.log('➕ Creating new lead');
+        const response = await api.post('/leads', payload);
+        console.log('✅ Create response:', response.data);
+
+        if (response.data.success) {
+          alert('✅ Customer added successfully!');
+          navigate('/admin/customers');
+        }
       }
     } catch (error) {
-      console.error('❌ Error creating lead:', error);
+      console.error('❌ API Error:', error);
+      console.error('Error response:', error.response?.data);
       setErrors({
-        submit: error.response?.data?.message || 'Failed to create customer',
+        submit:
+          error.response?.data?.message ||
+          'Operation failed. Please try again.',
       });
     } finally {
       setLoading(false);
     }
   };
 
+  if (fetchingLead) {
+    return (
+      <div className="min-h-screen bg-[#020202] text-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2
+            className="animate-spin text-amber-500 mx-auto mb-4"
+            size={48}
+          />
+          <p className="text-slate-400 font-bold">Loading customer data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#020202] text-white p-6 lg:p-12 font-['Space_Grotesk'] relative overflow-hidden">
-      {/* Background Glow */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-600/5 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -148,7 +295,7 @@ const CreateCustomer = () => {
           Back to Customers
         </button>
         <h1 className="text-5xl font-light tracking-tighter">
-          Add New{' '}
+          {isEditMode ? 'Update ' : 'Add New '}
           <span className="font-black italic bg-gradient-to-r from-amber-200 via-amber-500 to-amber-700 bg-clip-text text-transparent">
             CUSTOMER
           </span>
@@ -156,7 +303,6 @@ const CreateCustomer = () => {
       </motion.div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -165,20 +311,21 @@ const CreateCustomer = () => {
           <div className="p-8 lg:p-12">
             <div className="flex items-center gap-3 mb-10">
               <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-500">
-                <Target size={20} />
+                {isEditMode ? <Edit2 size={20} /> : <Target size={20} />}
               </div>
               <div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-white/80">
-                  Customer Details
+                  {isEditMode ? 'Update Customer' : 'Customer Details'}
                 </h2>
                 <p className="text-[10px] text-white/30 uppercase tracking-[0.2em]">
-                  Enter lead information and assignment
+                  {isEditMode
+                    ? 'Modify customer information'
+                    : 'Enter lead information and assignment'}
                 </p>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Name */}
                 <div className="space-y-2">
@@ -447,7 +594,6 @@ const CreateCustomer = () => {
                 </div>
               </div>
 
-              {/* Submit Error */}
               {errors.submit && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -461,7 +607,6 @@ const CreateCustomer = () => {
                 </motion.div>
               )}
 
-              {/* Action Buttons */}
               <div className="pt-6 flex flex-col sm:flex-row gap-4">
                 <button
                   type="submit"
@@ -471,11 +616,12 @@ const CreateCustomer = () => {
                   {loading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
-                      Saving...
+                      {isEditMode ? 'Updating...' : 'Saving...'}
                     </>
                   ) : (
                     <>
-                      <Save size={16} /> Add Customer
+                      <Save size={16} />
+                      {isEditMode ? 'Update Customer' : 'Add Customer'}
                     </>
                   )}
                 </button>
@@ -492,7 +638,7 @@ const CreateCustomer = () => {
           </div>
         </motion.div>
 
-        {/* Info Sidebar */}
+        {/* Sidebar - Keep same as before */}
         <div className="space-y-6">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -502,15 +648,23 @@ const CreateCustomer = () => {
           >
             <TrendingUp className="text-amber-500 mb-4" size={32} />
             <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-              Lead Pipeline
+              {isEditMode ? 'Update Mode' : 'Lead Pipeline'}
             </h3>
             <ul className="space-y-4">
-              {[
-                'New → Contacted',
-                'Qualified → Proposal',
-                'Negotiation → Converted',
-                'Track Deal Value & Priority',
-              ].map((item, idx) => (
+              {(isEditMode
+                ? [
+                    'Modify customer details',
+                    'Update deal value & status',
+                    'Reassign to team members',
+                    'Change priority levels',
+                  ]
+                : [
+                    'New → Contacted',
+                    'Qualified → Proposal',
+                    'Negotiation → Converted',
+                    'Track Deal Value & Priority',
+                  ]
+              ).map((item, idx) => (
                 <li
                   key={idx}
                   className="flex items-center gap-3 text-[10px] font-bold text-white/50 uppercase tracking-tighter"
@@ -529,8 +683,9 @@ const CreateCustomer = () => {
           >
             <Sparkles className="text-white/20 mb-4" size={24} />
             <p className="text-xs italic text-white/40 leading-relaxed">
-              "Leads are automatically tracked with timestamps. Assign to team
-              members and set follow-up reminders for better conversion rates."
+              {isEditMode
+                ? '"Update customer information to keep your CRM data accurate. Changes are tracked with timestamps for audit trails."'
+                : '"Leads are automatically tracked with timestamps. Assign to team members and set follow-up reminders for better conversion rates."'}
             </p>
           </motion.div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Mail,
@@ -11,25 +11,86 @@ import {
   Save,
   XCircle,
   Phone,
+  Edit2,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import api from '../src/api'; // Your axios instance
+import api from '../src/api';
 
 const CreateStaff = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams();
+
+  // Check if Edit Mode
+  const isEditMode = !!id || !!location.state?.user;
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    phone: '', // Optional field
-    role: 'sales', // Match schema enum: owner, manager, sales, designer, writer, developer
+    phone: '',
+    role: 'sales',
     isActive: true,
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [fetchingUser, setFetchingUser] = useState(false);
+
+  // ⭐ Auto-fill data when editing
+  useEffect(() => {
+    if (isEditMode) {
+      // Case 1: Data from location.state
+      if (location.state?.user) {
+        const u = location.state.user;
+        console.log('✅ User from location.state:', u);
+
+        setFormData({
+          name: u.name || '',
+          email: u.email || '',
+          phone: u.phone || '',
+          role: u.role || 'sales',
+          password: '',
+          confirmPassword: '',
+          isActive: u.isActive ?? true,
+        });
+      }
+      // Case 2: Fetch from API using ID
+      else if (id) {
+        fetchUserData(id);
+      }
+    }
+  }, [id, location.state, isEditMode]);
+
+  const fetchUserData = async (userId) => {
+    try {
+      setFetchingUser(true);
+      const res = await api.get(`/auth/users/${userId}`);
+      console.log('✅ User fetched from API:', res.data);
+
+      if (res.data.success && res.data.data) {
+        const u = res.data.data;
+        setFormData({
+          name: u.name || '',
+          email: u.email || '',
+          phone: u.phone || '',
+          role: u.role || 'sales',
+          password: '',
+          confirmPassword: '',
+          isActive: u.isActive ?? true,
+        });
+      }
+    } catch (err) {
+      console.error('❌ Fetch user error:', err);
+      setErrors({
+        submit: err.response?.data?.message || 'Failed to fetch user data',
+      });
+    } finally {
+      setFetchingUser(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -37,7 +98,6 @@ const CreateStaff = () => {
       ...formData,
       [name]: type === 'checkbox' ? checked : value,
     });
-    // Clear error for this field
     if (errors[name]) setErrors({ ...errors, [name]: '' });
   };
 
@@ -52,20 +112,37 @@ const CreateStaff = () => {
     // Email validation
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
 
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Minimum 6 characters required';
+    // Phone validation (optional but if provided, must be 10 digits)
+    if (formData.phone && !/^\d{10}$/.test(formData.phone.replace(/\s/g, ''))) {
+      newErrors.phone = 'Phone must be 10 digits';
     }
 
-    // Confirm password validation
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+    // Password validation
+    if (!isEditMode) {
+      // Create mode: Password required
+      if (!formData.password) {
+        newErrors.password = 'Password is required';
+      } else if (formData.password.length < 6) {
+        newErrors.password = 'Minimum 6 characters required';
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    } else {
+      // Edit mode: Password optional, but if provided must be valid
+      if (formData.password) {
+        if (formData.password.length < 6) {
+          newErrors.password = 'Minimum 6 characters required';
+        }
+        if (formData.password !== formData.confirmPassword) {
+          newErrors.confirmPassword = 'Passwords do not match';
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -77,38 +154,92 @@ const CreateStaff = () => {
     if (!validateForm()) return;
 
     setLoading(true);
+    setErrors({});
+
     try {
-      // ⭐ API call to /auth/register matching your User schema
-      const response = await api.post('/auth/register', {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password, // Backend will hash this with bcrypt
-        phone: formData.phone || undefined, // Optional
-        role: formData.role,
-        // isActive is handled by backend (default: true)
-      });
+      if (isEditMode) {
+        // ⭐ UPDATE MODE
+        const userId =
+          id || location.state?.user?._id || location.state?.user?.id;
 
-      console.log('✅ Registration response:', response.data);
+        if (!userId) {
+          setErrors({ submit: 'User ID missing. Cannot update.' });
+          setLoading(false);
+          return;
+        }
 
-      if (response.data.success) {
-        alert('✅ Team member created successfully!');
-        navigate('/admin/TeamManagement');
+        // Build update payload (exclude password if not provided)
+        const updatePayload = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || undefined,
+          role: formData.role,
+          isActive: formData.isActive,
+        };
+
+        // ⭐ Only include password if user wants to change it
+        if (formData.password && formData.password.trim()) {
+          updatePayload.password = formData.password;
+        }
+
+        console.log('📤 Update payload:', updatePayload);
+
+        const response = await api.put(`/auth/users/${userId}`, updatePayload);
+
+        console.log('✅ Update response:', response.data);
+
+        if (response.data.success) {
+          alert('✅ Team member updated successfully!');
+          navigate('/admin/TeamManagement');
+        }
+      } else {
+        // ⭐ CREATE MODE
+        const createPayload = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone || undefined,
+          role: formData.role,
+          isActive: formData.isActive,
+        };
+
+        console.log('📤 Create payload:', createPayload);
+
+        const response = await api.post('/auth/register', createPayload);
+
+        console.log('✅ Create response:', response.data);
+
+        if (response.data.success) {
+          alert('✅ Team member created successfully!');
+          navigate('/admin/TeamManagement');
+        }
       }
     } catch (error) {
-      console.error('❌ Registration error:', error);
+      console.error('❌ API Error:', error.response?.data || error.message);
       setErrors({
         submit:
           error.response?.data?.message ||
-          'Failed to create team member. Please try again.',
+          'Operation failed. Please try again.',
       });
     } finally {
       setLoading(false);
     }
   };
 
+  // Loading state while fetching user
+  if (fetchingUser) {
+    return (
+      <div className="min-h-screen bg-[#020202] text-white flex items-center justify-center">
+        <div className="text-center">
+          <Cpu className="animate-spin text-amber-500 mx-auto mb-4" size={48} />
+          <p className="text-slate-400 font-bold">Loading user data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#020202] text-white p-6 lg:p-12 font-['Space_Grotesk'] relative overflow-hidden">
-      {/* Background Glow */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-600/5 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Header */}
@@ -128,15 +259,14 @@ const CreateStaff = () => {
           Back to Command Center
         </button>
         <h1 className="text-5xl font-light tracking-tighter">
-          Initialize{' '}
+          {isEditMode ? 'Modify ' : 'Initialize '}
           <span className="font-black italic bg-gradient-to-r from-amber-200 via-amber-500 to-amber-700 bg-clip-text text-transparent">
-            NEW_NODE
+            {isEditMode ? 'NODE_CONFIG' : 'NEW_NODE'}
           </span>
         </h1>
       </motion.div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -145,14 +275,16 @@ const CreateStaff = () => {
           <div className="p-8 lg:p-12">
             <div className="flex items-center gap-3 mb-10">
               <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-500">
-                <Terminal size={20} />
+                {isEditMode ? <Edit2 size={20} /> : <Terminal size={20} />}
               </div>
               <div>
                 <h2 className="text-sm font-black uppercase tracking-widest text-white/80">
-                  Entity Configuration
+                  {isEditMode ? 'Update Parameters' : 'Entity Configuration'}
                 </h2>
                 <p className="text-[10px] text-white/30 uppercase tracking-[0.2em]">
-                  Define node parameters and access levels
+                  {isEditMode
+                    ? 'Modifying existing node sequence'
+                    : 'Define node parameters and access levels'}
                 </p>
               </div>
             </div>
@@ -211,10 +343,10 @@ const CreateStaff = () => {
                   )}
                 </div>
 
-                {/* Phone (Optional) */}
+                {/* Phone */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
-                    Contact Number
+                    Contact Number {!isEditMode && '*'}
                   </label>
                   <div className="relative group">
                     <Phone
@@ -226,13 +358,18 @@ const CreateStaff = () => {
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      placeholder="+91 98765 43210"
+                      placeholder="9876543210"
                       className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all font-medium text-sm"
                     />
                   </div>
+                  {errors.phone && (
+                    <p className="text-[9px] text-red-500 font-bold uppercase tracking-tighter ml-1">
+                      ⚠ {errors.phone}
+                    </p>
+                  )}
                 </div>
 
-                {/* Role Selection */}
+                {/* Role */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
                     Node Permissions *
@@ -267,7 +404,7 @@ const CreateStaff = () => {
                 {/* Password */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
-                    Access Key *
+                    {isEditMode ? 'New Access Key (Optional)' : 'Access Key *'}
                   </label>
                   <div className="relative group">
                     <Lock
@@ -279,7 +416,11 @@ const CreateStaff = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      placeholder="Min. 6 characters"
+                      placeholder={
+                        isEditMode
+                          ? 'Leave blank to keep current'
+                          : 'Min. 6 characters'
+                      }
                       className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all font-medium text-sm"
                     />
                   </div>
@@ -293,7 +434,7 @@ const CreateStaff = () => {
                 {/* Confirm Password */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 ml-1">
-                    Verify Key *
+                    Verify Key {isEditMode && '(If Changing)'}
                   </label>
                   <div className="relative group">
                     <ShieldCheck
@@ -315,9 +456,31 @@ const CreateStaff = () => {
                     </p>
                   )}
                 </div>
+
+                {/* Status Toggle (Edit Mode Only) */}
+                {isEditMode && (
+                  <div className="space-y-2 flex flex-col justify-end pb-1 md:col-span-2">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          name="isActive"
+                          checked={formData.isActive}
+                          onChange={handleChange}
+                          className="sr-only peer"
+                        />
+                        <div className="w-12 h-6 bg-white/10 rounded-full peer-checked:bg-amber-500/30 transition-all border border-white/5 peer-checked:border-amber-500/50"></div>
+                        <div className="absolute left-1 top-1 w-4 h-4 bg-white/20 rounded-full transition-all peer-checked:translate-x-6 peer-checked:bg-amber-500 shadow-xl"></div>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
+                        Node Activation Status (Active:{' '}
+                        {formData.isActive ? 'YES' : 'NO'})
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
 
-              {/* Submit Error */}
               {errors.submit && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -331,7 +494,6 @@ const CreateStaff = () => {
                 </motion.div>
               )}
 
-              {/* Action Buttons */}
               <div className="pt-6 flex flex-col sm:flex-row gap-4">
                 <button
                   type="submit"
@@ -345,7 +507,8 @@ const CreateStaff = () => {
                     </>
                   ) : (
                     <>
-                      <Save size={16} /> Register Node
+                      <Save size={16} />
+                      {isEditMode ? 'Update Configuration' : 'Register Node'}
                     </>
                   )}
                 </button>
@@ -372,24 +535,30 @@ const CreateStaff = () => {
           >
             <Cpu className="text-amber-500 mb-4" size={32} />
             <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-              Protocol Specs
+              {isEditMode ? 'Update Mode' : 'Protocol Specs'}
             </h3>
             <ul className="space-y-4">
-              {[
-                'Automatic Encryption (Bcrypt v12)',
-                'Role-Based Access Control (RBAC)',
-                'Real-time Node Monitoring',
-                'Instant Credential Dispatch',
-                'Email Uniqueness Validation',
-                'Default Active Status',
-              ].map((item, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-center gap-3 text-[10px] font-bold text-white/50 uppercase tracking-tighter"
-                >
-                  <div className="w-1 h-1 bg-amber-500 rounded-full" /> {item}
-                </li>
-              ))}
+              {isEditMode
+                ? [
+                    'Password update is optional',
+                    'Leave blank to keep current',
+                    'Email & phone must be unique',
+                    'Role & status can be changed',
+                  ]
+                : [
+                    'Automatic Encryption (Bcrypt v12)',
+                    'Role-Based Access Control (RBAC)',
+                    'Real-time Node Monitoring',
+                    'Instant Credential Dispatch',
+                  ].map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-center gap-3 text-[10px] font-bold text-white/50 uppercase tracking-tighter"
+                    >
+                      <div className="w-1 h-1 bg-amber-500 rounded-full" />{' '}
+                      {item}
+                    </li>
+                  ))}
             </ul>
           </motion.div>
 
@@ -401,39 +570,10 @@ const CreateStaff = () => {
           >
             <Sparkles className="text-white/20 mb-4" size={24} />
             <p className="text-xs italic text-white/40 leading-relaxed">
-              "Password hashing is handled securely on the backend using bcrypt
-              with 12 salt rounds. Never send hashed passwords from the
-              frontend."
+              {isEditMode
+                ? '"When updating, you can optionally change the password. If left blank, the current password remains unchanged."'
+                : '"Password hashing is handled securely on the backend using bcrypt. Never send hashed passwords from the frontend."'}
             </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6"
-          >
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mb-3">
-              Available Roles
-            </h4>
-            <div className="space-y-2">
-              {[
-                { role: 'Owner', desc: 'Full system access' },
-                { role: 'Manager', desc: 'Team oversight' },
-                { role: 'Sales', desc: 'CRM operations' },
-                { role: 'Developer', desc: 'Tech tasks' },
-                { role: 'Designer', desc: 'Creative work' },
-                { role: 'Writer', desc: 'Content creation' },
-              ].map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between text-[9px] text-white/30"
-                >
-                  <span className="font-bold uppercase">{r.role}</span>
-                  <span className="italic">{r.desc}</span>
-                </div>
-              ))}
-            </div>
           </motion.div>
         </div>
       </div>
